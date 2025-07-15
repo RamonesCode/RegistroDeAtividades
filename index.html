@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro de Atividades</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+      .activity-table::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .activity-table::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+      .activity-table::-webkit-scrollbar-thumb {
+        background: #cbd5e0;
+        border-radius: 4px;
+      }
+      .activity-table::-webkit-scrollbar-thumb:hover {
+        background: #a0aec0;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .pulse-animation {
+        animation: pulse 2s infinite;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+      <header class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-indigo-700 mb-2">Registro de Atividades</h1>
+        <p class="text-gray-600">Cronometre suas atividades e mantenha um histórico organizado</p>
+      </header>
+
+      <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+        <div class="flex flex-col md:flex-row gap-6">
+          <div class="flex-1">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Cronômetro</h2>
+            <div class="bg-indigo-50 rounded-lg p-4 mb-4">
+              <div id="timerDisplay" class="text-5xl font-mono text-center text-indigo-700 mb-4">00:00:00</div>
+              <div class="flex justify-center gap-3">
+                <button id="startBtn" class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                  Iniciar
+                </button>
+                <button id="stopBtn" class="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600" disabled>
+                  Parar
+                </button>
+                <button id="resetBtn" class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+                  Zerar
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="flex-1">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Registrar Atividade</h2>
+            <form id="activityForm" class="space-y-4">
+              <div>
+                <label for="activityDate" class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                <input type="date" id="activityDate" class="w-full px-3 py-2 border rounded-md" />
+              </div>
+              <div>
+                <label for="activityDescription" class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                <textarea
+                  id="activityDescription"
+                  rows="3"
+                  class="w-full px-3 py-2 border rounded-md"
+                  required
+                ></textarea>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500"
+                  >Tempo cronometrado: <span id="formTimeDisplay" class="font-medium">00:00:00</span></span
+                >
+                <button
+                  type="submit"
+                  id="saveBtn"
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  Salvar Atividade
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-md p-6">
+        <!-- Filtro de atividades -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-800 mb-2">Filtrar atividades</h2>
+          <div class="flex flex-wrap gap-3">
+            <input type="date" id="filterStartDate" class="border px-3 py-2 rounded-md" />
+            <input type="date" id="filterEndDate" class="border px-3 py-2 rounded-md" />
+            <input type="text" id="filterKeyword" placeholder="Descrição..." class="border px-3 py-2 rounded-md" />
+            <input type="time" id="filterMinTime" step="1" class="border px-3 py-2 rounded-md" />
+            <button id="applyFilterBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Filtrar</button>
+            <button id="clearFilterBtn" class="bg-gray-400 text-white px-4 py-2 rounded-md">Limpar</button>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-semibold text-gray-800">Histórico de Atividades</h2>
+          <button id="exportBtn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+            Exportar para Excel
+          </button>
+        </div>
+        <div class="overflow-x-auto activity-table">
+          <table id="activitiesTable" class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Descrição
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tempo</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="activitiesTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+          </table>
+          <div id="emptyTableMessage" class="text-center py-8 text-gray-500">
+            Nenhuma atividade registrada ainda. Comece a cronometrar suas atividades!
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        let timerInterval,
+          seconds = 0,
+          minutes = 0,
+          hours = 0,
+          isRunning = false;
+
+        const timerDisplay = document.getElementById('timerDisplay');
+        const formTimeDisplay = document.getElementById('formTimeDisplay');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const activityForm = document.getElementById('activityForm');
+        const activityDate = document.getElementById('activityDate');
+        const activityDescription = document.getElementById('activityDescription');
+        const activitiesTableBody = document.getElementById('activitiesTableBody');
+        const emptyTableMessage = document.getElementById('emptyTableMessage');
+        const exportBtn = document.getElementById('exportBtn');
+
+        const today = new Date().toISOString().split('T')[0];
+        activityDate.value = today;
+
+        function updateTimerDisplay() {
+          const timeString = [hours, minutes, seconds].map((n) => n.toString().padStart(2, '0')).join(':');
+          timerDisplay.textContent = timeString;
+          formTimeDisplay.textContent = timeString;
+        }
+
+        function startTimer() {
+          if (!isRunning) {
+            isRunning = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            timerDisplay.classList.add('pulse-animation');
+            timerInterval = setInterval(() => {
+              seconds++;
+              if (seconds === 60) {
+                seconds = 0;
+                minutes++;
+              }
+              if (minutes === 60) {
+                minutes = 0;
+                hours++;
+              }
+              updateTimerDisplay();
+            }, 1000);
+          }
+        }
+
+        function stopTimer() {
+          if (isRunning) {
+            clearInterval(timerInterval);
+            isRunning = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            timerDisplay.classList.remove('pulse-animation');
+          }
+        }
+
+        function resetTimer() {
+          stopTimer();
+          seconds = minutes = hours = 0;
+          updateTimerDisplay();
+        }
+
+        function formatDate(dateString) {
+          const date = new Date(dateString);
+          return date.toLocaleDateString('pt-BR');
+        }
+
+        function getSavedActivities() {
+          const saved = localStorage.getItem('atividades');
+          return saved ? JSON.parse(saved) : [];
+        }
+
+        function saveActivitiesToLocalStorage(activities) {
+          localStorage.setItem('atividades', JSON.stringify(activities));
+        }
+
+        function addActivityToTable({ date, description, time }) {
+          const newRow = document.createElement('tr');
+          newRow.innerHTML = `
+            <td class="px-6 py-4">${formatDate(date)}</td>
+            <td class="px-6 py-4">${description}</td>
+            <td class="px-6 py-4">${time}</td>
+            <td class="px-6 py-4"><button class="delete-btn text-red-600">Excluir</button></td>
+        `;
+          newRow.querySelector('.delete-btn').addEventListener('click', () => {
+            newRow.remove();
+            const saved = getSavedActivities().filter(
+              (item) => !(item.date === date && item.description === description && item.time === time),
+            );
+            saveActivitiesToLocalStorage(saved);
+            if (!activitiesTableBody.hasChildNodes()) emptyTableMessage.style.display = 'block';
+          });
+          activitiesTableBody.prepend(newRow);
+          emptyTableMessage.style.display = 'none';
+        }
+
+        activityForm.addEventListener('submit', function (event) {
+          event.preventDefault();
+          const date = activityDate.value;
+          const description = activityDescription.value.trim();
+          const time = formTimeDisplay.textContent;
+
+          if (!description || time === '00:00:00') return alert('Preencha a descrição e cronometre algum tempo.');
+
+          const activity = { date, description, time };
+          addActivityToTable(activity);
+
+          const current = getSavedActivities();
+          current.push(activity);
+          saveActivitiesToLocalStorage(current);
+
+          activityDescription.value = '';
+        });
+
+        exportBtn.addEventListener('click', function () {
+          const rows = activitiesTableBody.querySelectorAll('tr');
+          if (!rows.length) return alert('Nenhuma atividade para exportar.');
+
+          const data = [['Data', 'Descrição', 'Tempo']];
+          rows.forEach((row) => {
+            const cells = row.querySelectorAll('td');
+            data.push([cells[0].textContent, cells[1].textContent, cells[2].textContent]);
+          });
+
+          const ws = XLSX.utils.aoa_to_sheet(data);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Atividades');
+          XLSX.writeFile(wb, `atividades_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        });
+
+        startBtn.addEventListener('click', startTimer);
+        stopBtn.addEventListener('click', stopTimer);
+        resetBtn.addEventListener('click', resetTimer);
+
+        updateTimerDisplay();
+
+        getSavedActivities().forEach(addActivityToTable);
+
+        // Filtros
+        document.getElementById('applyFilterBtn').addEventListener('click', function () {
+          const startDate = document.getElementById('filterStartDate').value;
+          const endDate = document.getElementById('filterEndDate').value;
+          const keyword = document.getElementById('filterKeyword').value.toLowerCase();
+          const minTime = document.getElementById('filterMinTime').value;
+
+          const atividades = getSavedActivities().filter(({ date, description, time }) => {
+            const dateOk = (!startDate || date >= startDate) && (!endDate || date <= endDate);
+            const keywordOk = !keyword || description.toLowerCase().includes(keyword);
+            const timeOk = !minTime || time >= minTime + ':00';
+            return dateOk && keywordOk && timeOk;
+          });
+
+          activitiesTableBody.innerHTML = '';
+          if (atividades.length === 0) {
+            emptyTableMessage.style.display = 'block';
+          } else {
+            emptyTableMessage.style.display = 'none';
+            atividades.forEach(addActivityToTable);
+          }
+        });
+
+        document.getElementById('clearFilterBtn').addEventListener('click', function () {
+          document.getElementById('filterStartDate').value = '';
+          document.getElementById('filterEndDate').value = '';
+          document.getElementById('filterKeyword').value = '';
+          document.getElementById('filterMinTime').value = '';
+          activitiesTableBody.innerHTML = '';
+          const atividades = getSavedActivities();
+          if (atividades.length === 0) {
+            emptyTableMessage.style.display = 'block';
+          } else {
+            emptyTableMessage.style.display = 'none';
+            atividades.forEach(addActivityToTable);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
